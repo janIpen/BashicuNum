@@ -1,13 +1,36 @@
-export class Column {
+// don't export internal classes
+// I'd make it a class inside of Matrix if it was possible
+class Column {
     // this.array - Int[]
     // this.length - "canonical" length of the column
     constructor(array) {
-        // we presume they will be arrays of integers
-        this.array = array;
-        this.length = this.array.length;
+        // we **do not presume anything**
+        if (!Array.isArray(array))
+            throw new RangeError("Column input is not a valid column");
+        if (array.length == 0) {
+            this.#array = [0];
+            return;
+        }
+        let last = Number.MAX_SAFE_INTEGER + 1;
+        for (let e of array) {
+            if (e < 0|| e > last || e % 1 != 0)
+                throw new RangeError("Element ${e} of column is not a valid integer");
+            last = e;
+        }
+        // private properties, public methods
+        this.#array = array;
+    }
+    // store as little as needed
+    get height() {
+        if (this.#array.indexof(0) > -1) return this.#array.indexof(0);
+        return this.#array.length;
+    }
+    // I guess Matrix needs the column data
+    get array() {
+        return [...this.#array];
     }
     at(index) {
-        return this.array[index] || 0;
+        return this.#array[index] || 0;
     }
 
     // compares this column to another column
@@ -15,12 +38,12 @@ export class Column {
     // 0 if this == col
     // +1 if this > col
     cmp(col) {
-        for (let i = 0; i < Math.min(this.length, col.length); i++) {
+        for (let i = 0; i < Math.min(this.height, col.height); i++) {
             if (this.at(i) > col.at(i)) return 1;
             if (this.at(i) < col.at(i)) return -1;
         }
-        if (this.length > col.length) return 1;
-        if (this.length < col.length) return -1;
+        if (this.height > col.height) return 1;
+        if (this.height < col.height) return -1;
         return 0;
     }
     lt(col) {
@@ -40,22 +63,22 @@ export class Column {
     }
 
     isZero() {
-        for (let i = 0; i < this.array.length; i++) {
-            if (array[i] != 0) return false;
+        for (let i = 0; i < this.height; i++) {
+            if (this.#array[i] != 0) return false;
         }
         return true;
     }
 
     add(col) {
         let result = [];
-        for (let i = 0; i < Math.max(this.length, col.length); i++) {
+        for (let i = 0; i < Math.max(this.height, col.height); i++) {
             result.push(this.at(i) + col.at(i));
         }
         return new Column(result);
     }
     sub(col) {
         let result = [];
-        for (let i = 0; i < Math.max(this.length, col.length); i++) {
+        for (let i = 0; i < Math.max(this.height, col.height); i++) {
             result.push(this.at(i) - col.at(i));
         }
         return new Column(result);
@@ -63,42 +86,42 @@ export class Column {
 
     addScalar(n) {
         let result = [];
-        for (let i = 0; i < this.array.length; i++) {
-            result[i] = this.array[i] + n;
+        for (let i = 0; i < this.height; i++) {
+            result[i] = this.#array[i] + n;
         }
         return new Column(result);
     }
 
     push(element) {
-        this.array.push(element);
-        this.length = this.array.length;
+        this.#array.push(element);
     }
     toString(rows) {
-        if (!rows) return `(${this.array.join(",")})`;
-        if (rows < this.length)
-            throw new Error(
-                `toString(rows=${rows}) islesser than the number of non-zero rows in the column (${this.array.join(",")})`,
+        if (rows && rows < this.height)
+            throw new RangeError(
+                `toString(rows=${rows}) islesser than the number of non-zero rows in the column (${this.#array.join(",")})`,
             );
-        this.array.length = rows;
-        this.array.fill(0, this.length);
-        let output = `(${this.array.join(",")})`;
-        this.array.length = this.length; // reset length of this.array, this.length serves as storage of original length
-        return output;
+        // improve this so we aren't setting internal data
+        let output = `(${this.#array.join(",")}`;
+        output += ',0'.repeat((rows - this.height) || 0);
+        return output + ')';
     }
 }
-
 // BMS matrix
-export class Matrix {
+class Matrix {
     // this.columns - Column[] - Array of `Column`s
     // this.rows - the number of rows this matrix has, e.g. PrSS = 1, PSS = 2, TSS = 3, etc...
     constructor(columns) {
-        if (!Array.isArray(columns)) throw new Error(`Matrix() constructor called with non-array input ${columns}`);
+        if (!Array.isArray(columns) && (typeof(columns) !== "Number" || columns < 0 || columns > Number.MAX_SAFE_INTEGER || columns % 1 != 0))
+            throw new Error(`Matrix() constructor called with non-array input ${columns}`);
 
+        // Allow to just put in an integer :3
+        if (typeof(columns) === "Number") {
+            this.#columns = Array.from({length: columns}, () => new Column([0]));
+            return;
+        }
         // if its an array of `Column`s already just throw it in
         if (columns[0] instanceof Column) {
-            this.columns = columns;
-            let lengths = columns.map((col) => col.length);
-            this.rows = Math.max(...lengths);
+            this.#columns = columns;
             return;
         }
         // remove trailing zeroes [0,0,0] -> [0]
@@ -108,11 +131,10 @@ export class Matrix {
             }
             return col;
         });
-        let lengths = columns.map((col) => col.length);
-        if (lengths.length == 0)
-            this.rows = 1; // empty matrix () just set to 1
-        else this.rows = Math.max(...lengths);
-        this.columns = columns.map((col) => new Column(col));
+        this.#columns = columns.map((col) => new Column(col));
+    }
+    get rows() {
+        return Math.max(this.#columns.map(col => col.height));
     }
 
     // compares this matrix to another matrix
@@ -123,13 +145,13 @@ export class Matrix {
         if (this.rows > matrix.rows) return 1;
         if (this.rows < matrix.rows) return -1;
         // if (this.eq(matrix)) return false;
-        for (let i = 0; i < Math.min(this.columns.length, matrix.columns.length); i++) {
+        for (let i = 0; i < Math.min(this.#columns.length, matrix.#columns.length); i++) {
             // potentially optimizable? by calling the underlying cmp() once only
-            if (this.columns[i].gt(matrix.columns[i])) return 1;
-            if (this.columns[i].lt(matrix.columns[i])) return -1;
+            let cmp = this.#columns[i].cmp(matrix.#columns[i]);
+            if (cmp !== 0) return cmp;
         }
-        if (this.columns.length > matrix.columns.length) return 1;
-        if (this.columns.length < matrix.columns.length) return -1;
+        if (this.#columns.length > matrix.#columns.length) return 1;
+        if (this.#columns.length < matrix.#columns.length) return -1;
         return 0;
     }
     lt(matrix) {
@@ -151,7 +173,7 @@ export class Matrix {
     // returns the successor matrix of the current matrix
     successor() {
         const newCol = new Column(new Array(this.rows).fill(0));
-        const newCols = this.columns.concat([newCol]);
+        const newCols = this.#columns.concat([newCol]);
         return new Matrix(newCols);
     }
 
@@ -166,10 +188,10 @@ export class Matrix {
     // e.g. (0)(1)(0)(1)(0)(1) -> (0)(1)(1)[2]
     // if not returns undefined
     collapse() {
-        const l = this.columns.length;
+        const l = this.#columns.length;
         const maxPatternLength = Math.floor(l / 2);
         for (let patternLength = 1; patternLength <= maxPatternLength; patternLength++) {
-            const block1 = this.columns.slice(l - patternLength, l);
+            const block1 = this.#columns.slice(l - patternLength, l);
 
             // assert that all elements in the block1 must be greater than the first element in block1 to be a valid block
             // prevents collapsing things like (0),(1)(0),(1)(0),(1)(0),(1)(0),(1)(0)
@@ -188,9 +210,9 @@ export class Matrix {
             // e.g. (0,0)(1,1)(2,1)(3,0)'(1,0)(2,1)(3,1)(4,0) has a constant offset of (1,0)
             // e.g. (0,0)(1,1)(2,1)(3,0)'(1,0)(2,1)(3,1)(4,1) does not have a constant offset
             function isValidAscension(block1, block2, ascensionMatrix) {
-                if (block1.length != block2.length) return false; // bruh, maybe even error lowkey
+                if (block1.height != block2.height) return false; // bruh, maybe even error lowkey
                 if (!ascensionMatrix) ascensionMatrix = block1[0].sub(block2[0]);
-                for (let i = 1; i < block1.length; i++) {
+                for (let i = 1; i < block1.height; i++) {
                     if (!block1[i].sub(block2[i]).eq(ascensionMatrix)) return false;
                 }
                 return true;
@@ -208,7 +230,7 @@ export class Matrix {
             let blocksFound = 2;
             let prevBlock = block2;
             for (let i = 2; i < Math.floor(l / patternLength); i++) {
-                const currBlock = this.columns.slice(l - patternLength * (i + 1), l - patternLength * i);
+                const currBlock = this.#columns.slice(l - patternLength * (i + 1), l - patternLength * i);
                 if (!isValidAscension(prevBlock, currBlock, ascensionMatrix)) break;
                 blocksFound++;
             }
@@ -221,12 +243,12 @@ export class Matrix {
             if (ascensionMatrix.at(ascensionMatrix.length - 1) == 0) ascensionMatrix = ascensionMatrix.addScalar(1);
             else if (ascensionMatrix.at(ascensionMatrix.length - 1) != 0) {
                 let array = ascensionMatrix.array;
-                while (array[array.length - 1] == 0) array.pop();
+                while (array.at(-1) == 0) array.pop();
                 array.push(1);
                 ascensionMatrix = new Column(array);
             }
             let expander = badRoot.add(ascensionMatrix);
-            let newMatrix = new Matrix(this.columns.slice(0, l - patternLength * (blocksFound - 1)).concat([expander]));
+            let newMatrix = new Matrix(this.#columns.slice(0, l - patternLength * (blocksFound - 1)).concat([expander]));
             return {
                 newMatrix: newMatrix,
                 n: blocksFound - 1, // change depending on expansion rules
@@ -239,8 +261,8 @@ export class Matrix {
     }
 
     toString() {
-        if (this.columns.length == 0) return "()";
-        return this.columns.map((col) => col.toString(this.rows)).join("");
+        if (this.#columns.length == 0) return "()";
+        return this.#columns.map((col) => col.toString(this.rows)).join("");
     }
 }
 
@@ -266,8 +288,8 @@ export class BashicuNumber {
                 throw new Error(`BashicuNumber() cannot accept numbers above ${Number.MAX_SAFE_INTEGER}`);
             }
 
-            this.matrix = new Matrix([]);
-            this.value = arg1;
+            this.#matrix = new Matrix([]);
+            this.#value = arg1;
             this.normalize();
             return;
         }
@@ -284,8 +306,8 @@ export class BashicuNumber {
                 matrix = arg1;
             } else return; // error?
 
-            this.matrix = matrix;
-            this.value = arg2;
+            this.#matrix = matrix;
+            this.#value = arg2;
 
             this.normalize();
         }
@@ -293,25 +315,25 @@ export class BashicuNumber {
 
     // hopefully this doesnt become an infinite loop
     normalizeMatrix() {
-        const result = this.matrix.collapse();
+        const result = this.#matrix.collapse();
         if (!result) return;
         const { newMatrix, n } = result;
         if (n >= 10) {
-            this.matrix = newMatrix;
-            this.value = n + Math.log10(this.value);
+            this.#matrix = newMatrix;
+            this.#value = n + Math.log10(this.#value);
             this.normalize();
         }
     }
     normalize() {
         while (this.value >= 10) {
-            this.value = Math.log10(this.value);
-            this.matrix = this.matrix.successor();
+            this.#value = Math.log10(this.#value);
+            this.#matrix = this.#matrix.successor();
         }
         this.normalizeMatrix();
     }
 
     toString() {
-        return `BashicuNumber { matrix: ${this.matrix.toString()}, value: ${this.value} }`;
+        return `BashicuNumber { matrix: ${this.#matrix.toString()}, value: ${this.#value} }`;
     }
 
     // compares this matrix to another BashicuNumber n
@@ -319,10 +341,10 @@ export class BashicuNumber {
     // 0 if this == n
     // +1 if this > n
     cmp(n) {
-        if (this.matrix.lt(n.matrix)) return -1;
-        if (this.matrix.gt(n.matrix)) return 1;
-        if (this.value < n.value) return -1;
-        if (this.value > n.value) return 1;
+        if (this.#matrix.lt(n.#matrix)) return -1;
+        if (this.#matrix.gt(n.#matrix)) return 1;
+        if (this.#value < n.#value) return -1;
+        if (this.#value > n.#value) return 1;
         return 0; // equal
     }
     lt(n) {
@@ -351,8 +373,8 @@ export class BashicuNumber {
             b = n;
         }
 
-        let amatrix = a.matrix;
-        let bmatrix = b.matrix;
+        let amatrix = a.#matrix;
+        let bmatrix = b.#matrix;
 
         // past this point just take the bigger number
         if (amatrix.gteq(TWO_MATRIX) || bmatrix.gteq(TWO_MATRIX)) {
@@ -360,26 +382,26 @@ export class BashicuNumber {
         }
 
         if (amatrix.eq(ZERO_MATRIX) && bmatrix.eq(ZERO_MATRIX)) {
-            let newValue = a.value + b.value;
+            let newValue = a.#value + b.#value;
             // if (newValue < 10)
             return new BashicuNumber([], newValue);
             // else return new BashicuNumber([[0]], Math.log(newValue));
         }
 
         if (amatrix.eq(ONE_MATRIX) && bmatrix.eq(ZERO_MATRIX)) {
-            let newValue = Math.pow(10, a.value) + b.value;
+            let newValue = Math.pow(10, a.#value) + b.#value;
             return new BashicuNumber([], newValue);
         }
 
         if (amatrix.eq(ONE_MATRIX) && bmatrix.eq(ONE_MATRIX)) {
-            let newValue = Math.pow(10, a.value) + Math.pow(10, b.value);
+            let newValue = Math.pow(10, a.#value) + Math.pow(10, b.#value);
             return new BashicuNumber([], newValue);
         }
 
         return "bruh"; // throw an error instead or something idk
     }
     pow10() {
-        return new BashicuNumber(this.matrix.successor(), this.value);
+        return new BashicuNumber(this.#matrix.successor(), this.#value);
     }
     log10() {
         // if empty matrix then just Math.log10
