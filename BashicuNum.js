@@ -2,7 +2,7 @@
 // I'd make it a class inside of Matrix if it was possible
 class Column {
     // this.array - Int[]
-    // this.length - "canonical" length of the column
+    // this.height - "canonical" length of the column
     constructor(array) {
         // we **do not presume anything**
         if (!Array.isArray(array))
@@ -134,7 +134,7 @@ class Matrix {
         this.#columns = columns.map((col) => new Column(col));
     }
     get rows() {
-        return Math.max(this.#columns.map(col => col.height));
+        return Math.max(this.#columns.map(col => col.height), 1);
     }
 
     // compares this matrix to another matrix
@@ -144,9 +144,9 @@ class Matrix {
     cmp(matrix) {
         if (this.rows > matrix.rows) return 1;
         if (this.rows < matrix.rows) return -1;
-        // if (this.eq(matrix)) return false;
+        // if (this.eq(matrix)) return false; // <- infinite loop lolllll
         for (let i = 0; i < Math.min(this.#columns.length, matrix.#columns.length); i++) {
-            // potentially optimizable? by calling the underlying cmp() once only
+            // i optimised it for you :3
             let cmp = this.#columns[i].cmp(matrix.#columns[i]);
             if (cmp !== 0) return cmp;
         }
@@ -179,7 +179,7 @@ class Matrix {
 
     // returns whether or not the current matrix is a successor matrix (true) or a limit matrix instead (false)
     isSuccessor() {
-        const lastCol = this.columns[this.columns.length - 1];
+        const lastCol = this.columns.at(-1);
         return lastCol.isZero();
     }
 
@@ -237,7 +237,7 @@ class Matrix {
 
             // a pattern is found
             let indexOfBadRoot = l - patternLength * blocksFound;
-            let badRoot = this.columns[indexOfBadRoot];
+            let badRoot = this.#columns[indexOfBadRoot];
 
             // TODO: stress test ascension with various bms matrices
             if (ascensionMatrix.at(ascensionMatrix.length - 1) == 0) ascensionMatrix = ascensionMatrix.addScalar(1);
@@ -314,6 +314,7 @@ export class BashicuNumber {
     }
 
     // hopefully this doesnt become an infinite loop
+    // man you really need to be checking for n < 1 as well. idk how tho
     normalizeMatrix() {
         const result = this.#matrix.collapse();
         if (!result) return;
