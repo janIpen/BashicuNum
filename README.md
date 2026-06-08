@@ -30,9 +30,9 @@ Implements solarzone's idea, where you store numbers as matrix-value pairs:
 where 1 <= x < 10
 For limit expressions, we have:
 ```
-(0)(1) x+y = (0)(1)[x] 10^y where x is the integer part and y is the decimal part and 1 <= x+y < 10
+(0)(1) x = (0)(1)[int(x)] 10^frac(x)
 ```
-Maybe in another world it would be `(0)(1)[10^x] 10^y` but I dont want to deal with having to deal with matrices of length 10^9+
+Maybe in another world it would be `(0)(1)[10^int(x)] 10^frac(x)` but I dont want to deal with having to deal with matrices of length 10^9+
 
 The system is set up in a way that all normalized BashicuNumber matrices are successor matrices rather than limit matrices (I think)
 
