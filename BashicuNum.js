@@ -309,6 +309,8 @@ const ZERO_MATRIX = new Matrix([]);
 const ONE_MATRIX = new Matrix([[0]]);
 const TWO_MATRIX = new Matrix([[0], [0]]);
 const THREE_MATRIX = new Matrix([[0], [0], [0]]);
+const OMEGA_MATRIX = new Matrix([[0], [1]]);
+const OMEGAPLUSONE_MATRIX = new Matrix([[0], [1], [0]]);
 
 // stores numbers as matrix - value pairs:
 // () x = x
@@ -450,25 +452,84 @@ export class BashicuNumber {
 
         return "bruh"; // throw an error instead or something idk
     }
+    mul(n) {
+        // copy of add but with multiplication
+        let a, b; // a > b
+        if (this.lt(n)) {
+            a = n;
+            b = this;
+        } else {
+            a = this;
+            b = n;
+        }
+
+        let amatrix = a.#matrix;
+        let bmatrix = b.#matrix;
+
+        // past this point just take the bigger number
+        if (amatrix.gteq(THREE_MATRIX) || bmatrix.gteq(THREE_MATRIX)) {
+            return a;
+        }
+        
+        else if (amatrix.isZero() && bmatrix.isZero()) {
+            let newValue = a.#value * b.#value;
+            // if (newValue < 10)
+            return new BashicuNumber([], newValue);
+            // else return new BashicuNumber([[0]], Math.log(newValue));
+        }
+        
+        else if (amatrix.eq(ONE_MATRIX) && bmatrix.isZero()) {
+            let newValue = Math.pow(10, a.#value) * b.#value;
+            return new BashicuNumber([], newValue);
+        }
+        
+        else if (amatrix.eq(ONE_MATRIX) && bmatrix.eq(ONE_MATRIX)) {
+            let newValue = Math.pow(10, a.#value + b.#value);
+            return new BashicuNumber([], newValue);
+        }
+        
+        else if (amatrix.eq(TWO_MATRIX) && bmatrix.isZero()) {
+            let newValue = Math.pow(10, a.#value) + Math.log10(b.#value); // not the same so we aren't getting any 10^10^3 bullcrap
+            return new BashicuNumber(ONE_MATRIX, newValue);
+        }
+        
+        else if (amatrix.eq(TWO_MATRIX) && bmatrix.eq(ONE_MATRIX)) {
+            let newValue = Math.pow(10, a.#value) + b.#value;
+            return new BashicuNumber(ONE_MATRIX, newValue);
+        }
+        
+        else if (amatrix.eq(TWO_MATRIX) && bmatrix.eq(TWO_MATRIX)) {
+            let newValue = Math.pow(10, a.#value) + Math.pow(10, b.#value);
+            return new BashicuNumber(ONE_MATRIX, newValue);
+        }
+
+        return "bruh"; // throw an error instead or something idk
+    }
     pow10() {
-        return new BashicuNumber(this.#matrix.successor(), this.#value);
+        if this.#matrix.lt(OMEGA_MATRIX)
+            return new BashicuNumber(this.#matrix.successor(), this.#value);
+        else if this.#matrix.eq(OMEGA_MATRIX) // should never occur (?) but good to check
+            return new BashicuNumber(this.#matrix, this.#value + 1);
+        else if this.#matrix.eq(OMEGAPLUSONE_MATRIX)
+            return new BashicuNumber(this.#matrix, Math.log10(10**this.#value + 1));
+        else if this.#matrix.eq(new Matrix([[0], [1], [0], [0]]))
+            return new BashicuNumber(this.#matrix, Math.log10(Math.log10(10**10**this.#value + 1)));
+        // imprecision stopped this from mattering at (0)(1)(0)(0) 1.2 anyway
+        else return new BashicuNumber(this.#matrix, this.#value);
     }
     log10() {
         // if empty matrix then just Math.log10
-        if (this.#matrix.toString() == "()") return new BashicuNumber(ZERO_MATRIX, Math.log10(this.value));
-        // if matrix is successor (which it should be) just strip off the (0), then:
-        let newMatrix = this.#matrix;
-        if (this.#matrix.isSuccessor()) {
-            newMatrix = this.matrix.expand(1); // just chop off a zero it doesnt matter what n you expand by
-        }
-        // if resulting matrix is a limit matrix, expand the limit matrix accordingly
-        if (!newMatrix.isSuccessor()) {
-            console.log(this.#value);
-            let x = Math.floor(this.#value);
-            let y = this.#value - x;
-            return new BashicuNumber(newMatrix.expand(x), Math.pow(10, y));
-        } else {
-            return new BashicuNumber(newMatrix, this.#value);
-        }
+        if (this.#matrix.isZero()) return new BashicuNumber(ZERO_MATRIX, Math.log10(this.#value));
+        // if matrix is finite nonzero just strip off a (0)
+        if (this.#matrix.lt(OMEGA_MATRIX))
+            return new BashicuNumber(this.#matrix.expand(1), this.#value) // just chop off a zero it doesnt matter what n you expand by
+        // copy of pow10 from but with subtraction not addition
+        else if this.#matrix.eq(OMEGA_MATRIX)
+            return new BashicuNumber(this.#matrix, this.#value - 1);
+        else if this.#matrix.eq(OMEGAPLUSONE_MATRIX)
+            return new BashicuNumber(this.#matrix, Math.log10(10**this.#value - 1));
+        else if this.#matrix.eq(new Matrix([[0], [1], [0], [0]]))
+            return new BashicuNumber(this.#matrix, Math.log10(Math.log10(10**10**this.#value - 1)));
+        else return new BashicuNumber(this.#matrix, this.#value);
     }
 }
